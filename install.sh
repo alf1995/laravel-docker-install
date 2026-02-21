@@ -14,6 +14,8 @@ if [ ! -f src/artisan ]; then
   docker run --rm -v "$(pwd)/src":/app composer create-project laravel/laravel .
 fi
 
+sudo chown -R $USER:$USER src/
+
 # 1. Si no existe el .env en src, copiarlo del ejemplo
 if [ ! -f src/.env ]; then
     cp src/.env.example src/.env
@@ -23,18 +25,21 @@ fi
 # 2. Forzar la configuración limpia de Postgres
 echo "Configurando .env para PostgreSQL..."
 
-set -a
-source .env
-set +a
+if [ -f .env ]; then
+    export $(grep -v '^#' .env | xargs)
+else
+    echo "Error: No se encontró el archivo .env en la raíz"
+    exit 1
+fi
 
-# Reemplazamos la conexión
-sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=pgsql/' src/.env
-# Reemplazamos o quitamos comentarios de las variables clave
-sed -i 's/^# DB_HOST=.*/DB_HOST=db/' src/.env || sed -i 's/^DB_HOST=.*/DB_HOST=db/' src/.env
-sed -i 's/^# DB_PORT=.*/DB_PORT=5432/' src/.env || sed -i 's/^DB_PORT=.*/DB_PORT=5432/' src/.env
-sed -i 's/^# DB_DATABASE=.*/DB_DATABASE=$DB_DATABASE/' src/.env || sed -i 's/^DB_DATABASE=.*/DB_DATABASE=$DB_DATABASE/' src/.env
-sed -i 's/^# DB_USERNAME=.*/DB_USERNAME=$DB_USERNAME/' src/.env || sed -i 's/^DB_USERNAME=.*/DB_USERNAME=$DB_USERNAME/' src/.env
-sed -i 's/^# DB_PASSWORD=.*/DB_PASSWORD=$DB_PASSWORD/' src/.env || sed -i 's/^DB_PASSWORD=.*/DB_PASSWORD=$DB_PASSWORD/' src/.env
+# Usamos COMILLAS DOBLES (") para que se expandan las variables
+# Usamos un delimitador diferente (|) por si tu password tiene caracteres raros
+sed -i "s|^DB_CONNECTION=.*|DB_CONNECTION=pgsql|" src/.env
+sed -i "s|^DB_HOST=.*|DB_HOST=db|" src/.env
+sed -i "s|^DB_PORT=.*|DB_PORT=5432|" src/.env
+sed -i "s|^DB_DATABASE=.*|DB_DATABASE=$DB_DATABASE|" src/.env
+sed -i "s|^DB_USERNAME=.*|DB_USERNAME=$DB_USERNAME|" src/.env
+sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=$DB_PASSWORD|" src/.env
 
 # 3. Limpiar caché de Laravel por si acaso
 docker compose exec app php artisan config:clear || true
